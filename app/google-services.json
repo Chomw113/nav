@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "395854917834",
+    "project_id": "survivall-aa406",
+    "storage_bucket": "survivall-aa406.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:395854917834:android:f5b86699f5ebbd4f6fc433",
+        "android_client_info": {
+          "package_name": "com.example.nav"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDs2K_kZcEy5UsSKO0FA-YY0PhJMkMzExk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

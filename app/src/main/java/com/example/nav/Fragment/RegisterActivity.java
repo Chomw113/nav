@@ -1,9 +1,8 @@
 package com.example.nav.Fragment;
 
-import android.net.Uri;
+import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -12,138 +11,102 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.nav.R;
+import com.google.firebase.database.DatabaseException;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.net.HttpURLConnection;
-import java.net.URL;
-
-import javax.net.ssl.HttpsURLConnection;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
 public class RegisterActivity extends AppCompatActivity {
-
-    // 로그에 사용할 TAG 변수 선언
-    final private String TAG = getClass().getSimpleName();
 
     // 사용할 컴포넌트 선언
     EditText title_et, content_et;
     Button reg_button;
 
-    // 유저아이디 변수
-    String userid = "";
+    // 게시글 수정 모드 여부
+    boolean isEdit = false;
+
+    // 게시글의 고유 번호
+    String board_seq = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_register);
 
-// ListActivity 에서 넘긴 userid 를 변수로 받음
-        userid = getIntent().getStringExtra("userid");
+        // ListActivity에서 넘긴 변수들을 받아줌
+        isEdit = getIntent().getBooleanExtra("isEdit", false);
+        board_seq = getIntent().getStringExtra("board_seq");
 
-// 컴포넌트 초기화
+        // 컴포넌트 초기화
         title_et = findViewById(R.id.title_et);
         content_et = findViewById(R.id.content_et);
         reg_button = findViewById(R.id.reg_button);
 
-// 버튼 이벤트 추가
+        // 게시글 수정 모드인 경우 데이터 불러오기
+        if (isEdit) {
+            String title = getIntent().getStringExtra("title");
+            String content = getIntent().getStringExtra("content");
+
+            title_et.setText(title);
+            content_et.setText(content);
+        }
+
+        // 등록/수정 버튼 클릭 이벤트 설정
         reg_button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-// 게시물 등록 함수
-                RegBoard regBoard = new RegBoard();
-                regBoard.execute(userid, title_et.getText().toString(), content_et.getText().toString());
+                if (isEdit) {
+                    // 게시글 수정 모드인 경우
+                    updateBoard();
+                } else {
+                    // 게시글 등록 모드인 경우
+                    createBoard();
+                }
             }
         });
-
     }
 
-    class RegBoard extends AsyncTask<String, Void, String> {
+    private void createBoard() {
+        // 제목과 내용 가져오기
+        String title = title_et.getText().toString();
+        String content = content_et.getText().toString();
 
-        @Override
-        protected void onPreExecute() {
-            super.onPreExecute();
+        // Firebase 데이터베이스에 게시글 등록
+        DatabaseReference databaseReference = FirebaseDatabase.getInstance().getReference("board");
+        String newKey = databaseReference.push().getKey(); // 새로운 고유 키 생성
+        databaseReference.child(newKey).child("title").setValue(title);
+        databaseReference.child(newKey).child("content").setValue(content);
 
-            Log.d(TAG, "onPreExecute");
-        }
+        Toast.makeText(this, "게시물이 등록되었습니다.", Toast.LENGTH_SHORT).show();
 
+        // 등록 후 DetailActivity로 이동
+        Intent intent = new Intent(RegisterActivity.this, DetailActivity.class);
+        intent.putExtra("board_seq", newKey);
+        startActivity(intent);
 
-        @Override
-        protected void onPostExecute(String result) {
-            super.onPostExecute(result);
-            Log.d(TAG, "onPostExecute, " + result);
+        finish(); // 현재 액티비티 종료
+    }
 
-            if(result.equals("success")){
-// 결과값이 success 이면
-// 토스트 메시지를 뿌리고
-// 이전 액티비티(ListActivity)로 이동,
-// 이때 ListActivity 의 onResume() 함수 가 호출되며, 데이터를 새로 고침
-                Toast.makeText(RegisterActivity.this, "등록되었습니다.", Toast.LENGTH_SHORT).show();
-                finish();
-            }else
-            {
-                Toast.makeText(RegisterActivity.this, result, Toast.LENGTH_SHORT).show();
-            }
+    private void updateBoard() {
+        // 제목과 내용 가져오기
+        String title = title_et.getText().toString();
+        String content = content_et.getText().toString();
 
-        }
+        // Firebase 데이터베이스에서 게시글 수정
+        DatabaseReference databaseReference = FirebaseDatabase.getInstance().getReference("board").child(board_seq);
+        databaseReference.child("title").setValue(title);
+        databaseReference.child("content").setValue(content);
 
+        Toast.makeText(this, "게시물이 수정되었습니다.", Toast.LENGTH_SHORT).show();
 
-        @Override
-        protected String doInBackground(String... params) {
+        // 수정 후 DetailActivity로 이동
+        Intent intent = new Intent(RegisterActivity.this, DetailActivity.class);
+        intent.putExtra("board_seq", board_seq);
+        startActivity(intent);
 
-            String userid = params[0];
-            String title = params[1];
-            String content = params[2];
-
-            String server_url = "http://15.164.252.136/reg_board.php";
-
-
-            URL url;
-            String response = "";
-            try {
-                url = new URL(server_url);
-
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setReadTimeout(15000);
-                conn.setConnectTimeout(15000);
-                conn.setRequestMethod("POST");
-                conn.setDoInput(true);
-                conn.setDoOutput(true);
-                Uri.Builder builder = new Uri.Builder()
-                        .appendQueryParameter("userid", userid)
-                        .appendQueryParameter("title", title)
-                        .appendQueryParameter("content", content);
-                String query = builder.build().getEncodedQuery();
-
-                OutputStream os = conn.getOutputStream();
-                BufferedWriter writer = new BufferedWriter(
-                        new OutputStreamWriter(os, "UTF-8"));
-                writer.write(query);
-                writer.flush();
-                writer.close();
-                os.close();
-
-                conn.connect();
-                int responseCode=conn.getResponseCode();
-
-                if (responseCode == HttpsURLConnection.HTTP_OK) {
-                    String line;
-                    BufferedReader br=new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                    while ((line=br.readLine()) != null) {
-                        response+=line;
-                    }
-                }
-                else {
-                    response="";
-
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-
-            return response;
-        }
+        finish(); // 현재 액티비티 종료
     }
 }

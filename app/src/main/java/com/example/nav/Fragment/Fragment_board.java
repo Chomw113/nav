@@ -33,9 +33,18 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
 
+import com.google.firebase.database.ChildEventListener;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+
+
 import javax.net.ssl.HttpsURLConnection;
 
 public class Fragment_board extends Fragment {
+
+    private DatabaseReference databaseRef;
 
     private ListView listView;
     private Button reg_button;
@@ -48,6 +57,8 @@ public class Fragment_board extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.frag_board, container, false);
 
+        // Firebase Realtime Database의 "board" 레퍼런스를 가져옴
+        databaseRef = FirebaseDatabase.getInstance().getReference("board");
         listView = view.findViewById(R.id.listView);
         reg_button = view.findViewById(R.id.reg_button);
 
@@ -74,12 +85,80 @@ public class Fragment_board extends Fragment {
     }
 
     @Override
+
     public void onResume() {
         super.onResume();
-        GetBoard getBoard = new GetBoard();
-        getBoard.execute();
+
+        // 이벤트 리스너 등록
+        databaseRef.addChildEventListener(childEventListener);
+    }
+    public void onPause() {
+        super.onPause();
+
+        // 이벤트 리스너 해제
+        databaseRef.removeEventListener(childEventListener);
     }
 
+    private ChildEventListener childEventListener = new ChildEventListener() {
+        @Override
+        public void onChildAdded(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
+            // 데이터가 추가될 때 호출되는 콜백 메서드
+            String seq = snapshot.getKey();
+            String title = snapshot.child("title").getValue(String.class);
+
+            // 리스트에 추가
+            seqList.add(seq);
+            titleList.add(title);
+
+            // 어댑터 갱신
+            if (arrayAdapter == null) {
+                arrayAdapter = new ArrayAdapter<>(requireActivity(), android.R.layout.simple_list_item_1, titleList);
+                listView.setAdapter(arrayAdapter);
+            } else {
+                arrayAdapter.notifyDataSetChanged();
+            }
+        }
+
+        @Override
+        public void onChildChanged(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
+            // 데이터가 변경될 때 호출되는 콜백 메서드
+            String seq = snapshot.getKey();
+            String title = snapshot.child("title").getValue(String.class);
+            int index = seqList.indexOf(seq);
+
+            // 변경된 데이터로 업데이트
+            if (index >= 0) {
+                titleList.set(index, title);
+                arrayAdapter.notifyDataSetChanged();
+            }
+        }
+
+        @Override
+        public void onChildRemoved(@NonNull DataSnapshot snapshot) {
+            // 데이터가 삭제될 때 호출되는 콜백 메서드
+            String seq = snapshot.getKey();
+            int index = seqList.indexOf(seq);
+
+            // 삭제된 데이터 제거
+            if (index >= 0) {
+                seqList.remove(index);
+                titleList.remove(index);
+                arrayAdapter.notifyDataSetChanged();
+            }
+        }
+
+        @Override
+        public void onChildMoved(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
+            // 데이터의 순서가 변경될 때 호출되는 콜백 메서드
+            // 여기서는 사용하지 않음
+        }
+
+        @Override
+        public void onCancelled(@NonNull DatabaseError error) {
+            // 데이터 로드가 취소될 때 호출되는 콜백 메서드
+            // 여기서는 사용하지 않음
+        }
+    };
     private class GetBoard extends AsyncTask<String, Void, String> {
         @Override
         protected void onPreExecute() {
